@@ -150,6 +150,8 @@
     "check-release-dependencies": "node ./scripts/release/check-release-dependencies"
   },
   "resolutions": {
-    "react-is": "npm:react-is"
+    "react-is": "npm:react-is",
+    "//": "Used to install imagemin dependencies, because imagemin may not be installed in China. If it is abroad, you can delete it",
+    "bin-wrapper": "npm:bin-wrapper-china"
   }
 }
