@@ -188,12 +188,15 @@ function flushWork(hasTimeRemaining, initialTime) {
 
 function workLoop(hasTimeRemaining, initialTime) {
   let currentTime = initialTime;
+  // 判断延时队列里面的任务是否到了startTime，如果到了将它们放到taskQueue中
   advanceTimers(currentTime);
   currentTask = peek(taskQueue);
   while (
     currentTask !== null &&
     !(enableSchedulerDebugging && isSchedulerPaused)
   ) {
+    // 判断当前任务是否继续执行
+    // shouldYieldToHost()，判断是否需要让出主线程，如果目前执行时间未超过5ms，则不用让出
     if (
       currentTask.expirationTime > currentTime &&
       (!hasTimeRemaining || shouldYieldToHost())
@@ -209,8 +212,11 @@ function workLoop(hasTimeRemaining, initialTime) {
       if (enableProfiling) {
         markTaskRun(currentTask, currentTime);
       }
+      debugger;
+      // 执行任务的callback，同步任务是performSyncWorkOnRoot，并行任务是performConcurrentWorkOnRoot
       const continuationCallback = callback(didUserCallbackTimeout);
       currentTime = getCurrentTime();
+      // 如果返回的continuationCallback是函数，说明被中断了，则将这个函数作为当前任务新的回调。
       if (typeof continuationCallback === 'function') {
         currentTask.callback = continuationCallback;
         if (enableProfiling) {
@@ -221,14 +227,17 @@ function workLoop(hasTimeRemaining, initialTime) {
           markTaskCompleted(currentTask, currentTime);
           currentTask.isQueued = false;
         }
+        // 如果返回的continuationCallback不是函数，说明任务已经执行完毕，则从任务队列中移除当前任务
         if (currentTask === peek(taskQueue)) {
           pop(taskQueue);
         }
       }
+      // 执行完当前任务后，继续判断延时队列里的任务是否到了开始时间，如果到了则将其放到taskQueue任务队列中
       advanceTimers(currentTime);
     } else {
       pop(taskQueue);
     }
+    // 从队列中拿下一个任务继续执行
     currentTask = peek(taskQueue);
   }
   // Return whether there's additional work
@@ -305,6 +314,7 @@ function unstable_wrapCallback(callback) {
   };
 }
 
+// 生成调度任务，加入到调度队列，并开始调度
 function unstable_scheduleCallback(priorityLevel, callback, options) {
   var currentTime = getCurrentTime();
 
@@ -356,6 +366,8 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
 
   if (startTime > currentTime) {
     // This is a delayed task.
+    // 延迟任务，将其放入timerQueue中
+    // sortIndex设置为startTime，开始时间越晚，越迟执行
     newTask.sortIndex = startTime;
     push(timerQueue, newTask);
     if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
@@ -370,6 +382,7 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
+    // sortIndex设置为过期时间，过期时间越早，越早执行
     newTask.sortIndex = expirationTime;
     push(taskQueue, newTask);
     if (enableProfiling) {
@@ -380,10 +393,10 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
     // wait until the next time we yield.
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
+      // 开始调度
       requestHostCallback(flushWork);
     }
   }
-
   return newTask;
 }
 
@@ -439,6 +452,7 @@ let needsPaint = false;
 
 function shouldYieldToHost() {
   const timeElapsed = getCurrentTime() - startTime;
+  // debugger;
   if (timeElapsed < frameInterval) {
     // The main thread has only been blocked for a really short amount of time;
     // smaller than a single frame. Don't yield yet.
@@ -517,6 +531,7 @@ const performWorkUntilDeadline = () => {
     const currentTime = getCurrentTime();
     // Keep track of the start time so we can measure how long the main thread
     // has been blocked.
+    // 记录开始时间，可以监测主线程被阻塞的时间
     startTime = currentTime;
     const hasTimeRemaining = true;
 
@@ -528,6 +543,7 @@ const performWorkUntilDeadline = () => {
     // `hasMoreWork` will remain true, and we'll continue the work loop.
     let hasMoreWork = true;
     try {
+      // scheduledHostCallback就是flushWork
       hasMoreWork = scheduledHostCallback(hasTimeRemaining, currentTime);
     } finally {
       if (hasMoreWork) {
